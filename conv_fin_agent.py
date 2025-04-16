@@ -1,7 +1,6 @@
 from typing import Literal
 from typing_extensions import TypedDict
 
-
 from langchain_ollama.chat_models import ChatOllama
 from langgraph.types import Command
 
@@ -13,13 +12,16 @@ from langgraph.prebuilt import create_react_agent
 
 
 def create_graph():
-    """Create a graph for the conv-fin-agent.
+    """
+    Create an agent to solve financial questions. The agent will use a multi-agent system to solve the problem.
 
-    This is a multi-agent graph that uses a supervisor to route tasks to the different members
-    data_extractor and maths_solver. The data_extractor is responsible for extracting the relevant data from the user's input
+    This agent uses a supervisor to route tasks to the different members.
+
+    data_extractor: The data_extractor is responsible for extracting the relevant data from the user's input
+    maths_solver: This agent is responsible for performing the maths operations on the data extracted by the data_extractor
     """
 
-    members = ["data_extractor", "maths_solver"]
+    members = ["data_extractor", "maths_solver"]#, "answer_verifier"]
 
     # Our team supervisor is an LLM node. It just picks the next agent to do work
     # and decides when the work is completed
@@ -57,12 +59,13 @@ def create_graph():
 
 
     data_extraction_agent = create_react_agent(
-        llm, tools = [], prompt="You are a data extraction expert for financial services data. You identify the relevant information to answer the question. DO NOT do any math."
+        llm, tools = [], prompt="You are a data extraction expert for financial services data. You identify the relevant information to answer the question. Return the relevant information and the equation to be solved. DO NOT do any math."
     )
 
 
     def data_extractor_node(state: State) -> Command[Literal["supervisor"]]:
         result = data_extraction_agent.invoke(state)
+        #TODO: Should i store the relevant data in it's own state variable?
         return Command(
             update={
                 "messages": [
@@ -93,7 +96,7 @@ def create_graph():
         return a * b
 
 
-    maths_agent = create_react_agent(llm, tools=[add, subtract, multiply, divide])
+    maths_agent = create_react_agent(llm, tools=[add, subtract, multiply, divide], prompt="You are a maths expert. Your task is to solve the users question given the data the data extractor has identified. You will be given the equation and the relevant data. You will return the answer to the original question.")
 
 
     def maths_node(state: State) -> Command[Literal["supervisor"]]:
